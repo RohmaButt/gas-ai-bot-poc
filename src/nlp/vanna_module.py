@@ -44,6 +44,7 @@ def setup_vanna(database_path="retail.db"):
     except Exception as e:
         print(f"Error setting up Vanna: {e}")
         return None
+    
 
 def text_to_sql_vanna(vn, question):
     """
