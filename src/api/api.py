@@ -5,7 +5,7 @@ from fastapi import UploadFile, File
 from src.nlp.tts import TTS
 from src.nlp.stt import STT
 from src.nlp.vanna_module import get_response
-from database.database import create_connection
+from src.database.database import create_connection
 import os
 
 router = APIRouter()

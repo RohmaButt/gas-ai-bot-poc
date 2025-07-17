@@ -1,6 +1,6 @@
 import vanna as vnn
 from vanna.remote import VannaDefault
-from database.database import create_connection
+from src.database.database import create_connection
 from src.nlp.utils import format_results
 
 def setup_vanna(database_path="retail.db"):
