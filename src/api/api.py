@@ -4,6 +4,8 @@ from fastapi import UploadFile, File
 
 from src.nlp.tts import TTS
 from src.nlp.stt import STT
+from src.nlp.vanna_module import get_response
+from database.database import create_connection
 import os
 
 router = APIRouter()
@@ -69,3 +71,28 @@ async def speech_to_text(
         "language_name": language_name
     }
 
+
+@router.post("/text-to-sql/")
+async def text_to_sql(question: str):
+    """
+    Convert a natural language question to SQL using Vanna.
+
+    Args:
+        question (str): The natural language question
+
+    Returns:
+        dict: Contains the generated SQL query or an error message
+    """
+    conn = None
+    try:
+        conn = create_connection(r"retail.db")
+        if conn is None:
+            raise HTTPException(status_code=500, detail="Database connection failed.")
+        
+        sql_query = get_response(question)
+        return {"sql_query": sql_query}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
