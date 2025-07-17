@@ -1,5 +1,5 @@
-from database.database import create_connection
-from nlp.main import get_response
+from src.database.database import create_connection
+from nlp.vanna_module import get_response
 
 def main():
     conn = create_connection(r"retail.db")
