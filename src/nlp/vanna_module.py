@@ -1,5 +1,7 @@
 import vanna as vnn
 from vanna.remote import VannaDefault
+from database.database import create_connection
+from src.nlp.utils import format_results
 
 def setup_vanna(database_path="retail.db"):
     """
@@ -72,3 +74,22 @@ def text_to_sql_vanna(vn, question):
     except Exception as e:
         print(f"Error generating SQL: {e}")
         return None
+
+
+def get_response(user_input):
+    """Gets a response from the database based on user input."""
+    vn = setup_vanna()
+    sql_query = text_to_sql_vanna(vn, user_input)
+
+    if sql_query:
+        conn = create_connection(r"retail.db")
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute(sql_query)
+            results = cursor.fetchall()
+            formatted = format_results(cursor, results)
+            conn.close()
+            return formatted
+            
+        return "I'm sorry, I don't understand."
+    
