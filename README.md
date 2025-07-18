@@ -123,6 +123,7 @@ Response:
 {
     "audio_file": "URL to the generated audio file"
 }
+```
 
 ## Text-to-SQL Endpoint
 
@@ -164,6 +165,7 @@ Error Response Example:
 {
   "detail": "GROQ_API_KEY environment variable not found. Please add it to your .env file."
 }
+```
 
 ## Environment Variables
 
