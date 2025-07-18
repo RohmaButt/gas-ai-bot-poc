@@ -6,6 +6,8 @@ This repository contains a Voice Assistant API that provides speech-to-text (STT
 - [Setup](#setup)
 - [Running the API](#running-the-api)
 - [API Endpoints](#api-endpoints)
+- [Text-to-SQL Endpoint](#text-to-sql-endpoint)
+- [Environment Variables](#environment-variables)
 
 ## Setup
 
@@ -41,11 +43,15 @@ pip install -r requirements.txt
      ```bash
      cp .env.example .env
      ```
-   - Edit `.env` and add your Vanna.ai API key:
+
+   - Edit `.env` and add your Groq API key:
      ```
-     VANNA_API_KEY=your_api_key_here
+     GROQ_API_KEY=your_groq_api_key_here
+     GROQ_MODEL=mixtral-8x7b-32768
      ```
-   You can obtain your API key from the Vanna.ai dashboard.
+   You can obtain your API key from the Groq dashboard.
+
+   - The `.env.example` file is provided as a template. Do **not** commit your real `.env` file to version control.
 
 ## Running the API
 
@@ -117,6 +123,56 @@ Response:
 {
     "audio_file": "URL to the generated audio file"
 }
+
+## Text-to-SQL Endpoint
+
+Convert a natural language question into a SQL query and get results from the retail database.
+
+```http
+POST /text-to-sql
+```
+
+Parameters (query or JSON body):
+- `question` (string, required): The natural language question to convert to SQL
+- `top_k` (integer, optional): Maximum number of results to return (default: 10)
+
+Example Request:
+```json
+{
+  "question": "Show me all products with price over $100",
+  "top_k": 5
+}
+```
+
+Example Response:
+```json
+{
+  "status": "success",
+  "sql_query": "SELECT id, name, price FROM products WHERE price > 100 ORDER BY price DESC LIMIT 5",
+  "raw_result": [
+    {"id": 1, "name": "Gaming Laptop", "price": 1499.99},
+    {"id": 2, "name": "Business Laptop", "price": 1299.99}
+  ],
+  "natural_language_response": "I found 2 products with prices over $100:\n\n1. Gaming Laptop - $1,499.99\n2. Business Laptop - $1,299.99",
+  "tables_used": ["products"],
+  "question": "Show me all products with price over $100"
+}
+```
+
+Error Response Example:
+```json
+{
+  "detail": "GROQ_API_KEY environment variable not found. Please add it to your .env file."
+}
+
+## Environment Variables
+
+The following environment variables are required:
+
+- `GROQ_API_KEY`: Your Groq API key (required)
+- `GROQ_MODEL`: The Groq model to use (default: mixtral-8x7b-32768)
+
+See `.env.example` for a template.
 
 ```http
 POST /text-to-speech
