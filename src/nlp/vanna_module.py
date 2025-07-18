@@ -2,22 +2,26 @@ import vanna as vnn
 from vanna.remote import VannaDefault
 from src.database.database import create_connection
 from src.nlp.utils import format_results
+from src.config import VANNA_API_KEY, VANNA_MODEL, DATABASE_PATH
 
-def setup_vanna(database_path="retail.db"):
+def setup_vanna(database_path=None):
     """
     Initializes and trains Vanna.ai with a local SQLite database.
     
     Args:
-        database_path (str): Path to the SQLite database file (default: 'retail.db')
+        database_path (str): Optional path to override the default database path
     
     Returns:
         VannaDefault: Initialized Vanna object
     """
     try:
+        if not VANNA_API_KEY:
+            raise ValueError("VANNA_API_KEY not found in environment variables")
+
         # Initialize Vanna and connect to SQLite
-        api_key = vnn.get_api_key('codewithdark90@gmail.com')
-        vanna_instance = VannaDefault(model="chinook", api_key=api_key)
-        vanna_instance.connect_to_sqlite(database_path)
+        api_key = vnn.get_api_key('codewithdark90@gmail.com', '1D4JML')
+        vanna_instance = VannaDefault(model=VANNA_MODEL, api_key=api_key)
+        vanna_instance.connect_to_sqlite(DATABASE_PATH)
 
         # Add context about the database schema
         schema_context = """
