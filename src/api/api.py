@@ -4,8 +4,8 @@ from fastapi import UploadFile, File
 
 from src.nlp.tts import TTS
 from src.nlp.stt import STT
-from src.nlp.vanna_module import get_response
 from src.database.database import create_connection
+# SQL Agent is imported in the endpoint to ensure lazy loading
 import os
 
 router = APIRouter()
@@ -73,26 +73,54 @@ async def speech_to_text(
 
 
 @router.post("/text-to-sql/")
-async def text_to_sql(question: str):
+async def text_to_sql(question: str, top_k: int = 10):
     """
-    Convert a natural language question to SQL using Vanna.
+    Convert a natural language question to SQL using SQLAgent.
 
     Args:
         question (str): The natural language question
+        top_k (int): Maximum number of results to return (default: 10)
 
     Returns:
-        dict: Contains the generated SQL query or an error message
+        dict: Contains the SQL query, results, and natural language response
     """
-    conn = None
     try:
-        conn = create_connection(r"retail.db")
-        if conn is None:
-            raise HTTPException(status_code=500, detail="Database connection failed.")
+        # Initialize SQL Agent
+        from src.nlp.sql_agent import SQLAgent
+        agent = SQLAgent()
         
-        sql_query = get_response(question)
-        return {"sql_query": sql_query}
+    except ValueError as ve:
+        # Handle missing environment variables
+        raise HTTPException(
+            status_code=500,
+            detail=f"Configuration error: {str(ve)}"
+        )
+    except Exception as init_error:
+        # Handle other initialization errors
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to initialize SQL Agent: {str(init_error)}"
+        )
+        
+    try:
+        # Process the question
+        result = agent.query(question, top_k=top_k)
+        
+        # Check for errors
+        if result["status"] == "error":
+            raise HTTPException(
+                status_code=500, 
+                detail=result["error_details"] if "error_details" in result else "Query processing failed"
+            )
+        
+        return result
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            conn.close()
+        # Handle query processing errors
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing query: {str(e)}"
+        )
