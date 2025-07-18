@@ -36,6 +36,17 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+4. Set up environment variables:
+   - Copy `.env.example` to `.env`:
+     ```bash
+     cp .env.example .env
+     ```
+   - Edit `.env` and add your Vanna.ai API key:
+     ```
+     VANNA_API_KEY=your_api_key_here
+     ```
+   You can obtain your API key from the Vanna.ai dashboard.
+
 ## Running the API
 
 1. Start the FastAPI server:
