@@ -125,23 +125,61 @@ Response:
 }
 ```
 
-## Text-to-SQL Endpoint
+## Text-to-SQL Component
 
-Convert a natural language question into a SQL query and get results from the retail database.
+The SQL Agent component provides natural language to SQL query conversion for a retail database system.
+
+### Database Schema
+
+The system works with the following tables:
+
+1. **Departments**
+   - Fields: dept_id (PK), dept_name, location, manager_id, budget
+   - Contains: IT, HR, Sales, Marketing, Finance, Operations departments
+
+2. **Employees**
+   - Fields: emp_id (PK), first_name, last_name, email, phone, hire_date, job_title, salary, dept_id (FK), manager_id, status
+   - Status values: 'Active', 'Inactive', 'On Leave'
+
+3. **Customers**
+   - Fields: customer_id (PK), first_name, last_name, email, phone, address, city, country, registration_date, credit_limit
+
+4. **Orders**
+   - Fields: order_id (PK), customer_id (FK), order_date, total_amount, status
+   - Status values: 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'
+
+5. **Order Items**
+   - Fields: item_id (PK), order_id (FK), product_id (FK), quantity, unit_price, total_price
+
+6. **Products**
+   - Fields: product_id (PK), product_name, category, price, stock_quantity, supplier_id (FK), description
+   - Categories: Electronics, Furniture
+
+7. **Suppliers**
+   - Fields: supplier_id (PK), company_name, contact_name, email, phone, address, city, country
+
+### API Endpoint
 
 ```http
 POST /text-to-sql
 ```
 
-Parameters (query or JSON body):
-- `question` (string, required): The natural language question to convert to SQL
-- `top_k` (integer, optional): Maximum number of results to return (default: 10)
+Parameters:
+- `question` (string, required): Natural language question to convert to SQL
 
-Example Request:
+Example Requests:
+
+1. Employee Query:
 ```json
 {
-  "question": "Show me all products with price over $100",
-  "top_k": 5
+  "question": "Show me active IT department employees sorted by salary"
+}
+```
+
+2. Sales Analysis:
+```json
+{
+  "question": "Find total sales by product category for the last month"
 }
 ```
 
@@ -149,14 +187,18 @@ Example Response:
 ```json
 {
   "status": "success",
-  "sql_query": "SELECT id, name, price FROM products WHERE price > 100 ORDER BY price DESC LIMIT 5",
+  "sql_query": "SELECT TOP 10 e.first_name, e.last_name, e.job_title, d.dept_name, e.salary FROM employees e INNER JOIN departments d ON e.dept_id = d.dept_id WHERE d.dept_name = 'IT' AND e.status = 'Active' ORDER BY e.salary DESC",
   "raw_result": [
-    {"id": 1, "name": "Gaming Laptop", "price": 1499.99},
-    {"id": 2, "name": "Business Laptop", "price": 1299.99}
+    {
+      "first_name": "John",
+      "last_name": "Doe",
+      "job_title": "IT Manager",
+      "dept_name": "IT",
+      "salary": 95000.00
+    }
   ],
-  "natural_language_response": "I found 2 products with prices over $100:\n\n1. Gaming Laptop - $1,499.99\n2. Business Laptop - $1,299.99",
-  "tables_used": ["products"],
-  "question": "Show me all products with price over $100"
+  "natural_language_response": "Found 1 employee(s) in the IT department:\n1. John Doe, IT Manager, Salary: $95,000.00",
+  "tables_used": ["employees", "departments"]
 }
 ```
 
@@ -171,10 +213,44 @@ Error Response Example:
 
 The following environment variables are required:
 
+### API Configuration
 - `GROQ_API_KEY`: Your Groq API key (required)
 - `GROQ_MODEL`: The Groq model to use (default: mixtral-8x7b-32768)
 
+### Database Configuration
+- `DB_SERVER`: SQL Server hostname
+- `DB_NAME`: Database name
+- `DB_USER`: Database username
+- `DB_PASSWORD`: Database password
+- `DB_DRIVER`: SQL Server driver (default: "ODBC Driver 17 for SQL Server")
+- `SQL_ROW_LIMIT`: Maximum number of rows to return (default: 10)
+
 See `.env.example` for a template.
+
+### SQL Agent Features
+
+The SQL Agent includes several advanced features:
+
+1. **Schema Validation**
+   - Automatic table and column validation
+   - Relationship verification
+   - SQL syntax checking
+
+2. **Query Generation**
+   - Support for complex JOINs
+   - Automatic TOP clause inclusion
+   - Proper SQL Server syntax
+   - Date and aggregation functions
+
+3. **Error Handling**
+   - Detailed error messages
+   - Invalid query detection
+   - Schema mismatch reporting
+
+4. **Result Processing**
+   - Natural language response formatting
+   - Result size limiting
+   - Proper data type handling
 
 ```http
 POST /text-to-speech
