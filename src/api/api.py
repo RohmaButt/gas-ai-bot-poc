@@ -73,13 +73,12 @@ async def speech_to_text(
 
 
 @router.post("/text-to-sql/")
-async def text_to_sql(question: str, top_k: int = 10):
+async def text_to_sql(question: str):
     """
     Convert a natural language question to SQL using SQLAgent.
 
     Args:
         question (str): The natural language question
-        top_k (int): Maximum number of results to return (default: 10)
 
     Returns:
         dict: Contains the SQL query, results, and natural language response
@@ -104,7 +103,7 @@ async def text_to_sql(question: str, top_k: int = 10):
         
     try:
         # Process the question
-        result = agent.query(question, top_k=top_k)
+        result = agent.query(question)
         
         # Check for errors
         if result["status"] == "error":
