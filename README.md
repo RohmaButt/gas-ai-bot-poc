@@ -211,7 +211,6 @@ Result:
 }
 ```
 
-
 ### SQL Agent Features
 
 The SQL Agent includes several advanced features:
