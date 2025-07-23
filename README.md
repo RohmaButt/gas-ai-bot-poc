@@ -38,18 +38,25 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. Set up environment variables:
+1. Set up environment variables:
    - Copy `.env.example` to `.env`:
      ```bash
      cp .env.example .env
      ```
 
-   - Edit `.env` and add your Groq API key:
+   - Edit `.env` with your configuration:
      ```
-     GROQ_API_KEY=your_groq_api_key_here
-     GROQ_MODEL=mixtral-8x7b-32768
+     # Database Configuration
+     DB_SERVER=your_server
+     DB_NAME=your_database
+     DB_USER=your_username
+     DB_PASSWORD=your_password
+     DB_DRIVER=ODBC Driver 17 for SQL Server
+     
+     # LLM Configuration
+      GROQ_API_KEY=your_groq_api_key
+      GROQ_MODEL=meta-llama/llama-4-scout-17b-16e-instruct  # used this model Long Context
      ```
-   You can obtain your API key from the Groq dashboard.
 
    - The `.env.example` file is provided as a template. Do **not** commit your real `.env` file to version control.
 
@@ -62,7 +69,7 @@ uvicorn src.main:app --reload
 
 The API will be available at `http://localhost:8000`
 
-## API Endpoints
+## API Endpoints for `/languages`
 
 ### 1. Get Supported Languages
 Get a list of all supported languages for speech recognition.
@@ -88,7 +95,7 @@ Response:
 }
 ```
 
-### 2. Speech to Text
+### 2. API Endpoint for `/speech-to-text`
 Convert speech from an audio file to text.
 
 ```http
@@ -108,7 +115,7 @@ Response:
 }
 ```
 
-### 3. Text to Speech
+### 3. API Endpoint for `/text-to-speech`
 Convert text to speech.
 ```http
 POST /text-to-speech
@@ -158,7 +165,7 @@ The system works with the following tables:
 7. **Suppliers**
    - Fields: supplier_id (PK), company_name, contact_name, email, phone, address, city, country
 
-### API Endpoint
+### API Endpoint for `/text-to-sql`
 
 ```http
 POST /text-to-sql
@@ -179,53 +186,30 @@ Example Requests:
 2. Sales Analysis:
 ```json
 {
-  "question": "Find total sales by product category for the last month"
+  "question": "How many new customers were acquired each month?"
 }
 ```
 
 Example Response:
 ```json
+Result:
 {
   "status": "success",
-  "sql_query": "SELECT TOP 10 e.first_name, e.last_name, e.job_title, d.dept_name, e.salary FROM employees e INNER JOIN departments d ON e.dept_id = d.dept_id WHERE d.dept_name = 'IT' AND e.status = 'Active' ORDER BY e.salary DESC",
+  "sql_query": "SELECT TOP 3\nYEAR(c.registration_date) AS Year,\nMONTH(c.registration_date) AS Month,\nCOUNT(c.customer_id) AS NewCustomers\nFROM\ncustomers c\nGROUP BY\nYEAR(c.registration_date),\nMONTH(c.registration_date)\nORDER BY\nYear,\nMonth",
   "raw_result": [
     {
-      "first_name": "John",
-      "last_name": "Doe",
-      "job_title": "IT Manager",
-      "dept_name": "IT",
-      "salary": 95000.00
+      "Year": 2025,
+      "Month": 7,
+      "NewCustomers": 2
     }
   ],
-  "natural_language_response": "Found 1 employee(s) in the IT department:\n1. John Doe, IT Manager, Salary: $95,000.00",
-  "tables_used": ["employees", "departments"]
+  "natural_language_response": "Based on the data, here's the information on new customers acquired each month:\n\nIn July 2025, **2 new customers** were acquired.\n\nThat's the only data available for now. If you're looking for information on previous months or a longer period, please let me know and I can try to provide that for you! \n\nIf you have any other questions or need further assistance, feel free to ask!",
+  "tables_used": [
+    "CUSTOMERS"
+  ],
+  "question": "How many new customers were acquired each month?"
 }
 ```
-
-Error Response Example:
-```json
-{
-  "detail": "GROQ_API_KEY environment variable not found. Please add it to your .env file."
-}
-```
-
-## Environment Variables
-
-The following environment variables are required:
-
-### API Configuration
-- `GROQ_API_KEY`: Your Groq API key (required)
-- `GROQ_MODEL`: The Groq model to use (default: mixtral-8x7b-32768)
-
-### Database Configuration
-- `DB_SERVER`: SQL Server hostname
-- `DB_NAME`: Database name
-- `DB_USER`: Database username
-- `DB_PASSWORD`: Database password
-- `DB_DRIVER`: SQL Server driver (default: "ODBC Driver 17 for SQL Server")
-- `SQL_ROW_LIMIT`: Maximum number of rows to return (default: 10)
-
-See `.env.example` for a template.
 
 ### SQL Agent Features
 
@@ -252,46 +236,3 @@ The SQL Agent includes several advanced features:
    - Result size limiting
    - Proper data type handling
 
-```http
-POST /text-to-speech
-```
-
-Parameters:
-- `text`: The text to convert to speech
-- `lang`: Language code (optional, defaults to "en")
-
-Response:
-- Audio file (WAV format)
-
-## Error Handling
-
-The API returns standard HTTP status codes:
-
-- 200: Success
-- 400: Bad Request (invalid parameters)
-- 500: Server Error
-
-Error responses include a detail message:
-```json
-{
-    "detail": "Error message here"
-}
-```
-
-## Notes for Frontend Integration
-
-1. **Audio Format Support**:
-   - The API accepts WAV, MP3, and OGG formats
-   - For best results, use WAV format with PCM encoding
-
-2. **File Size Limits**:
-   - Maximum file size: 10MB
-   - Maximum audio duration: 1 minute
-
-3. **CORS**:
-   - The API has CORS enabled for frontend integration
-   - Default allowed origins: all (`*`)
-
-4. **Real-time Processing**:
-   - Speech recognition typically takes 2-5 seconds
-   - Text-to-speech conversion is usually under 1 second

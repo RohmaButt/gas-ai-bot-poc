@@ -15,7 +15,7 @@ app.add_middleware(
 app.include_router(router, prefix="/api", tags=["API"])
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the NPL API. Use /api/text-to-speech/ to convert text to speech."}
+    return {"message": "Welcome to the Text2SQL Agents. "}
 
 # If you want to run the FastAPI app, you can use the command:
 # uvicorn main:app --reload
