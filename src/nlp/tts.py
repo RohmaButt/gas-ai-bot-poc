@@ -28,10 +28,10 @@ class TTS:
             print(f"Error during text-to-speech conversion: {e}")
 
 
-if __name__ == "__main__":
-    tts = TTS(lang='en')
-    text = "Hello, this is a test of the text-to-speech functionality."
-    tts.text_to_speech(text)
+# if __name__ == "__main__":
+#     tts = TTS(lang='en')
+#     text = "Hello, this is a test of the text-to-speech functionality."
+#     tts.text_to_speech(text)
 
     # tts = TTS(lang='zh-CN')
     # text = "你好，这是文本转语音功能的测试。"
