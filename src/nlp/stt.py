@@ -97,10 +97,16 @@ class STT:
                         if lang_code.startswith(detected_language):
                             detected_language = lang_code
                             break
+                    # convert only the chinese LN into the Big5 encoding
+                    if detected_language == 'zh-CN':
+                        text = text.encode('big5', errors='ignore').decode('big5')
                     return text, detected_language
                 else:
-                    text = self.recognizer.recognize_google(recorded_audio, language=language)
-                    return text, language
+                    if language == 'zh-CN':
+                        # Special handling for Chinese to Big5 encoding
+                        text = self.recognizer.recognize_google(recorded_audio, language=language)
+                        text = text.encode('big5', errors='ignore').decode('big5')
+                        return text, language
 
         except sr.UnknownValueError:
             raise HTTPException(status_code=400, detail="Could not understand the audio. Please speak clearly and try again.")
