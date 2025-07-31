@@ -1,162 +1,180 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
-from fastapi import UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import List, Dict, Tuple
+import io
+import os
+from gtts import gTTS
+from pydub import AudioSegment
+import speech_recognition as sr
+from langdetect import detect, DetectorFactory
 from googletrans import Translator, LANGUAGES
 
-from src.nlp.tts import TTS
-from src.nlp.stt import STT
-from src.database.database import create_connection
-# SQL Agent is imported in the endpoint to ensure lazy loading
-import os
+DetectorFactory.seed = 0
 
 router = APIRouter()
 
-@router.post("/text-to-speech/")
-async def text_to_speech(text: str, lang: str = 'en'):
-    """
-    Convert text to speech and save it to a file.
-    
-    Args:
-        text (str): The text to convert to speech.
-        lang (str): Language code for the speech (default: 'en').
-    
-    Returns:
-        FileResponse: Response containing the audio file.
-    """
-    tts = TTS(lang=lang)
-    try:
-        tts.text_to_speech(text)
-        return FileResponse(tts.output_file, media_type="audio/wav", filename=tts.output_file)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
+class TTSRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=5000)
+    lang: str = Field(default='en', min_length=2, max_length=7)
 
-@router.get("/languages/")
+class TTS:
+    def __init__(self, lang: str = 'en', output_file: str = 'output.wav'):
+        # Normalize language code to lowercase
+        self.lang = lang.lower()
+        self.output_file = output_file
+
+    def text_to_speech(self, text: str) -> None:
+        try:
+            tts = gTTS(text=text, lang=self.lang)
+            tts.save(self.output_file)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"TTS conversion failed: {str(e)}")
+
+class STT:
+    def __init__(self):
+        self.recognizer = sr.Recognizer()
+        self.supported_languages: Dict[str, str] = {
+            'en-us': 'English (US)', 'en-gb': 'English (UK)', 'es-es': 'Spanish',
+            'fr-fr': 'French', 'de-de': 'German', 'it-it': 'Italian',
+            'pt-br': 'Portuguese (Brazil)', 'ru-ru': 'Russian', 'ja-jp': 'Japanese',
+            'ko-kr': 'Korean', 'zh-cn': 'Chinese (Simplified)', 'ar-sa': 'Arabic',
+            'hi-in': 'Hindi', 'tr-tr': 'Turkish'
+        }
+
+    def get_supported_languages(self) -> List[Dict[str, str]]:
+        return [{"code": code, "name": name} for code, name in self.supported_languages.items()]
+
+    def get_language_name(self, language_code: str) -> str:
+        return self.supported_languages.get(language_code.lower(), 'Unknown')
+
+    async def speech_to_text(self, audio_file: UploadFile, language: str = "auto") -> Tuple[str, str]:
+        try:
+            # Normalize language code
+            language = language.lower()
+            if language != "auto" and language not in self.supported_languages:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported language code. Supported languages: {', '.join(self.supported_languages.keys())}"
+                )
+
+            audio_bytes = await audio_file.read()
+            audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
+            pcm_wav_io = io.BytesIO()
+            audio_segment.export(pcm_wav_io, format="wav")
+            pcm_wav_io.seek(0)
+
+            with sr.AudioFile(pcm_wav_io) as source:
+                self.recognizer.adjust_for_ambient_noise(source)
+                recorded_audio = self.recognizer.record(source)
+
+                if language == "auto":
+                    text = self.recognizer.recognize_google(recorded_audio)
+                    detected_language = detect(text)
+                    for lang_code in self.supported_languages:
+                        if lang_code.startswith(detected_language):
+                            detected_language = lang_code
+                            break
+                    return text, detected_language
+                else:
+                    text = self.recognizer.recognize_google(recorded_audio, language=language)
+                    return text, language
+
+        except sr.UnknownValueError:
+            raise HTTPException(status_code=400, detail="Could not understand audio")
+        except sr.RequestError as e:
+            raise HTTPException(status_code=502, detail=f"Speech recognition service error: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+class TranslationRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=5000)
+    source_lang: str = "auto"
+    target_lang: str = Field(..., min_length=2, max_length=7)
+
+class TranslationResponse(BaseModel):
+    original_text: str
+    source_lang: str
+    target_lang: str
+    translated_text: str
+
+class SpeechToTextResponse(BaseModel):
+    text: str
+    language_code: str
+    language_name: str
+
+@router.post("/text-to-speech", response_class=FileResponse)
+async def text_to_speech(request: TTSRequest):
+    tts = TTS(lang=request.lang)
+    tts.text_to_speech(request.text)
+    return FileResponse(
+        path=tts.output_file,
+        media_type="audio/wav",
+        filename=os.path.basename(tts.output_file)
+    )
+
+@router.get("/languages", response_model=List[Dict[str, str]])
 async def get_supported_languages():
-    """
-    Get list of supported languages for speech recognition.
-    
-    Returns:
-        dict: List of supported languages with their codes and names
-    """
-    stt = STT()
-    return {"languages": stt.get_supported_languages()}
+    return STT().get_supported_languages()
 
-@router.post("/speech-to-text/")
-async def speech_to_text(
-    audio_file: UploadFile = File(...),
-    language: str = "auto"
-):
-    """
-    Convert speech from an audio file to text with language support.
-    
-    Args:
-        audio_file (UploadFile): The uploaded audio file
-        language (str): Language code for recognition (e.g., 'en-US', 'es-ES')
-                       Use 'auto' for automatic language detection
-    
-    Returns:
-        dict: Contains recognized text, language code, and language name
-    """
-    stt = STT()
-
+@router.post("/speech-to-text", response_model=SpeechToTextResponse)
+async def speech_to_text(audio_file: UploadFile = File(...), language: str = "auto"):
     if not audio_file:
-        raise HTTPException(status_code=400, detail="Audio file must be provided.")
-
-    text, detected_language = await stt.speech_to_text(audio_file, language)
-    language_name = stt.get_language_name(detected_language)
+        raise HTTPException(status_code=400, detail="Audio file required")
     
+    stt = STT()
+    text, detected_language = await stt.speech_to_text(audio_file, language)
     return {
         "text": text,
         "language_code": detected_language,
-        "language_name": language_name
+        "language_name": stt.get_language_name(detected_language)
     }
 
+@router.post("/translate", response_model=TranslationResponse)
+async def translate(request: TranslationRequest):
+    # Normalize language codes to lowercase
+    source_lang = request.source_lang.lower()
+    target_lang = request.target_lang.lower()
 
-@router.post("/text-to-sql/")
-async def text_to_sql(question: str):
-    """
-    Convert a natural language question to SQL using SQLAgent.
+    if source_lang != "auto" and source_lang not in LANGUAGES:
+        raise HTTPException(status_code=400, detail=f"Invalid source language: {source_lang}")
+    if target_lang not in LANGUAGES:
+        raise HTTPException(status_code=400, detail=f"Invalid target language: {target_lang}")
 
-    Args:
-        question (str): The natural language question
-
-    Returns:
-        dict: Contains the SQL query, results, and natural language response
-    """
+    translator = Translator()
     try:
-        # Initialize SQL Agent
+        translation = translator.translate(
+            request.text,
+            src=source_lang,
+            dest=target_lang
+        )
+        return {
+            "original_text": request.text,
+            "source_lang": source_lang,
+            "target_lang": target_lang,
+            "translated_text": translation.text
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Translation error: {str(e)}")
+
+@router.post("/text-to-sql")
+async def text_to_sql(question: str):
+    try:
         from src.nlp.sql_agent import SQLAgent
         agent = SQLAgent()
-        
-    except ValueError as ve:
-        # Handle missing environment variables
-        raise HTTPException(
-            status_code=500,
-            detail=f"Configuration error: {str(ve)}"
-        )
-    except Exception as init_error:
-        # Handle other initialization errors
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to initialize SQL Agent: {str(init_error)}"
-        )
-        
-    try:
-        # Process the question
         result = agent.query(question)
         
-        # Check for errors
-        if result["status"] == "error":
+        if result.get("status") == "error":
             raise HTTPException(
-                status_code=500, 
-                detail=result["error_details"] if "error_details" in result else "Query processing failed"
+                status_code=500,
+                detail=result.get("error_details", "Query processing failed")
             )
         
         return result
         
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=f"SQL Agent import failed: {str(e)}")
+    except ValueError as ve:
+        raise HTTPException(status_code=500, detail=f"Configuration error: {str(ve)}")
     except Exception as e:
-        # Handle query processing errors
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error processing query: {str(e)}"
-        )
-    
-class TranslationRequest(BaseModel):
-    text: str
-    source_lang: str = "auto"  # Default to auto-detect
-    target_lang: str
-
-def translate_text(text: str, source_lang: str, target_lang: str) -> str:
-    try:
-        # Validate language codes
-        if source_lang != "auto" and source_lang not in LANGUAGES:
-            raise ValueError(f"Invalid source language: {source_lang}")
-        if target_lang not in LANGUAGES:
-            raise ValueError(f"Invalid target language: {target_lang}")
-        
-        translator = Translator()
-        translation = translator.translate(text, src=source_lang, dest=target_lang)
-        return translation.text
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Translation error: {str(e)}")
-
-# Endpoint to translate text
-@router.post("/translate/", response_model=dict)
-async def translate(request: TranslationRequest):
-    try:
-        translated_text = translate_text(request.text, request.source_lang, request.target_lang)
-        return {
-            "original_text": request.text,
-            "source_lang": request.source_lang,
-            "target_lang": request.target_lang,
-            "translated_text": translated_text
-        }
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Query processing error: {str(e)}")

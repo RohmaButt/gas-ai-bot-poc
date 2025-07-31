@@ -98,14 +98,14 @@ class STT:
                             detected_language = lang_code
                             break
                     # convert only the chinese LN into the Big5 encoding
-                    if detected_language == 'zh-CN':
-                        text = text.encode('big5', errors='ignore').decode('big5')
+                    # if detected_language == 'zh-CN':
+                        # text = text.encode('big5', errors='ignore').decode('big5')
                     return text, detected_language
                 else:
                     if language == 'zh-CN':
                         # Special handling for Chinese to Big5 encoding
                         text = self.recognizer.recognize_google(recorded_audio, language=language)
-                        text = text.encode('big5', errors='ignore').decode('big5')
+                        # text = text.encode('big5', errors='ignore').decode('big5')
                         return text, language
 
         except sr.UnknownValueError:
