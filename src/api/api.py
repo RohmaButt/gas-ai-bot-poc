@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from fastapi import UploadFile, File
+from pydantic import BaseModel
+from googletrans import Translator, LANGUAGES
 
 from src.nlp.tts import TTS
 from src.nlp.stt import STT
@@ -123,3 +125,38 @@ async def text_to_sql(question: str):
             status_code=500,
             detail=f"Error processing query: {str(e)}"
         )
+    
+class TranslationRequest(BaseModel):
+    text: str
+    source_lang: str = "auto"  # Default to auto-detect
+    target_lang: str
+
+def translate_text(text: str, source_lang: str, target_lang: str) -> str:
+    try:
+        # Validate language codes
+        if source_lang != "auto" and source_lang not in LANGUAGES:
+            raise ValueError(f"Invalid source language: {source_lang}")
+        if target_lang not in LANGUAGES:
+            raise ValueError(f"Invalid target language: {target_lang}")
+        
+        translator = Translator()
+        translation = translator.translate(text, src=source_lang, dest=target_lang)
+        return translation.text
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Translation error: {str(e)}")
+
+# Endpoint to translate text
+@router.post("/translate/", response_model=dict)
+async def translate(request: TranslationRequest):
+    try:
+        translated_text = translate_text(request.text, request.source_lang, request.target_lang)
+        return {
+            "original_text": request.text,
+            "source_lang": request.source_lang,
+            "target_lang": request.target_lang,
+            "translated_text": translated_text
+        }
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
