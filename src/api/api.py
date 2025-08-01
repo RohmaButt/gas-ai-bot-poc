@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, Path, UploadFile, File
 from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Tuple
 import io
@@ -82,7 +83,7 @@ class STT:
     def get_language_name(self, language_code: str) -> str:
         return self.supported_languages.get(language_code.lower(), "Unknown")
 
-    async def speech_to_text(self, audio_file: UploadFile, language: str = "auto") -> Tuple[str, str]:
+    async def speech_to_text(self, audio_file: File, language: str = "auto") -> Tuple[str, str]:
         try:
             language = language.lower()
             if language != "auto" and language not in self.supported_languages:
@@ -143,14 +144,14 @@ async def get_supported_languages():
 
 @router.post("/speech-to-text", response_model=SpeechToTextResponse)
 async def speech_to_text(
-    audio_file: UploadFile = File(...), 
+    file_path: str = Path(..., description="Path to the audio file"),
     language: str = "auto"
 ):
-    if not audio_file:
-        raise HTTPException(status_code=400, detail="Audio file required")
-    
+    if not os.path.exists(file_path):
+        return JSONResponse(content={"error": "File not found"}, status_code=404)
+
     stt = STT()
-    text, detected_language = await stt.speech_to_text(audio_file, language)
+    text, detected_language = await stt.speech_to_text(file_path, language)
     return {
         "text": text,
         "language_code": detected_language,
@@ -161,8 +162,8 @@ async def speech_to_text(
 async def translate(
     request: TranslationRequest
 ):
-    source_lang = request.source_lang.lower()
-    target_lang = request.target_lang.lower()
+    source_lang = request.source_lang
+    target_lang = request.target_lang
 
     translator = GoogleTranslator(source=source_lang, target=target_lang)
     try:
