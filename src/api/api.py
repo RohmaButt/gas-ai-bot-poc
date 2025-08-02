@@ -14,6 +14,9 @@ from langdetect import detect, DetectorFactory
 from deep_translator import GoogleTranslator
 import uuid
 
+from src.nlp.tts import TTS
+# from src.nlp.stt import STT
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,27 +47,6 @@ class TranslationResponse(BaseModel):
     source_lang: str
     target_lang: str
     translated_text: str
-
-class TTS:
-    def __init__(self, lang: str = "en"):
-        self.lang = lang.lower()
-        self.supported_languages = GoogleTranslator().get_supported_languages(as_dict=True)
-
-    def validate_language(self):
-        if self.lang not in self.supported_languages:
-            raise HTTPException(status_code=400, detail=f"Unsupported language: {self.lang}")
-
-    async def text_to_speech(self, text: str) -> io.BytesIO:
-        try:
-            self.validate_language()
-            tts = gTTS(text=text, lang=self.lang)
-            audio_io = io.BytesIO()
-            tts.write_to_fp(audio_io)
-            audio_io.seek(0)
-            return audio_io
-        except Exception as e:
-            logger.error(f"TTS conversion failed: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"TTS conversion failed: {str(e)}")
 
 class STT:
     def __init__(self):

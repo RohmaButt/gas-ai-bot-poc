@@ -1,6 +1,7 @@
 import gtts
 import os
 from pydub import AudioSegment
+import io
 
 class TTS:
     """
@@ -10,7 +11,7 @@ class TTS:
         self.lang = lang
         self.output_file = output_file
 
-    def text_to_speech(self, text):
+    async def text_to_speech(self, text):
         """ 
             Convert text to speech and save it to a file.
         Args:
@@ -21,9 +22,10 @@ class TTS:
         try:
             # Generate speech using gTTS
             tts = gtts.gTTS(text, lang=self.lang)
-            temp_file = self.output_file
-            tts.save(temp_file)
-            print(f"Speech saved to {temp_file}")
+            audio_io = io.BytesIO()
+            tts.write_to_fp(audio_io)
+            audio_io.seek(0)
+            return audio_io
         except Exception as e:
             print(f"Error during text-to-speech conversion: {e}")
 
